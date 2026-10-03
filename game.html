@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node Cutter - Board Game Chiến Thuật Lưới Vô Tận</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header Navigation */
+  header {
+    background: #1e293b;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #334155;
+    z-index: 10;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  }
+  .title-group h1 { font-size: 1.1rem; color: #38bdf8; font-weight: 700; letter-spacing: 0.5px; }
+  .title-group p { font-size: 0.75rem; color: #94a3b8; }
+
+  .turn-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+  }
+  .turn-p1 { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+  .turn-p2 { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+  .dot-indicator { width: 10px; height: 10px; border-radius: 50%; }
+  .p1-dot { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+  .p2-dot { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+  .controls { display: flex; gap: 8px; }
+  .btn {
+    background: #334155;
+    color: #f8fafc;
+    border: 1px solid #475569;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: #475569; border-color: #64748b; }
+  .btn-primary { background: #0284c7; border-color: #0369a1; }
+  select.btn { appearance: auto; padding: 6px 8px; }
+  select.btn option { background: #1e293b; color: #f8fafc; }
+  .controls { flex-wrap: wrap; align-items: center; }
+  .btn-primary:hover { background: #0369a1; }
+
+  /* Main Game Canvas Container */
+  .main-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 55px);
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  /* UI Panels Overlay */
+  .stats-panel {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid #334155;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    width: 230px;
+    z-index: 5;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  }
+  .player-stat { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #1e293b; }
+  .player-stat:last-child { margin-bottom: 0; border: none; }
+  .stat-title { font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .p1-text { color: #60a5fa; }
+  .p2-text { color: #f87171; }
+  .stat-val { font-size: 0.75rem; color: #cbd5e1; display: flex; justify-content: space-between; margin-top: 2px;}
+
+  .action-log {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    max-width: 600px;
+    margin: 0 auto;
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid #334155;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-align: center;
+    color: #e2e8f0;
+    pointer-events: none;
+    z-index: 5;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  /* Modals */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal-content {
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 650px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 24px;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #334155; padding-bottom: 12px; }
+  .modal-header h2 { font-size: 1.25rem; color: #38bdf8; }
+  .close-btn { background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
+  .close-btn:hover { color: #f8fafc; }
+  .rules-section { margin-bottom: 14px; font-size: 0.88rem; line-height: 1.5; color: #cbd5e1; }
+  .rules-section h3 { font-size: 0.95rem; color: #f1f5f9; margin-bottom: 6px; }
+  .rules-section ul { padding-left: 18px; margin-top: 4px; }
+  .rules-section li { margin-bottom: 6px; }
+  .highlight-tag { background: #334155; color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-group">
+    <h1>NODE CUTTER</h1>
+    <p>Game Chiến Thuật Lưới Vô Tận & Phản Cắt</p>
+  </div>
+
+  <div id="turnBadge" class="turn-badge turn-p1">
+    <div id="dotIndicator" class="dot-indicator p1-dot"></div>
+    <span id="turnText">Lượt: Người chơi 1 (Xanh)</span>
+  </div>
+
+  <div class="controls">
+    <select id="modeSelect" class="btn" onchange="onBotSettingsChange()" title="Chế độ chơi">
+      <option value="pvp">2 người chơi</option>
+      <option value="hvb">Bạn (Xanh) vs Bot (Đỏ)</option>
+      <option value="bvh">Bot (Xanh) vs Bạn (Đỏ)</option>
+      <option value="bvb">Bot vs Bot (xem)</option>
+    </select>
+    <select id="levelSelect" class="btn" onchange="onBotSettingsChange()" title="Độ khó của Bot">
+      <option value="0">Bot: Dễ</option>
+      <option value="1">Bot: Vừa</option>
+      <option value="2" selected>Bot: Khó</option>
+      <option value="3">Bot: Cao thủ</option>
+    </select>
+    <button class="btn" onclick="recenterMap()">Căn giữa</button>
+    <button class="btn" onclick="promptReset()">Ván mới</button>
+    <button class="btn btn-primary" onclick="toggleModal('rulesModal', true)">Luật chơi</button>
+  </div>
+</header>
+
+<div class="main-container">
+  <canvas id="gameCanvas"></canvas>
+
+  <div class="stats-panel">
+    <div class="player-stat">
+      <div class="stat-title p1-text"><span>🔵 P1 (Xanh)</span> <span id="p1Status">SỐNG</span></div>
+      <div class="stat-val"><span>Sống / Chết / Tổng:</span> <strong id="p1Nodes">1 / 0 / 1</strong></div>
+      <div class="stat-val"><span>Nhánh Base dùng:</span> <strong id="p1BaseBranches">0 / 6</strong></div>
+    </div>
+    <div class="player-stat">
+      <div class="stat-title p2-text"><span>🔴 P2 (Đỏ)</span> <span id="p2Status">SỐNG</span></div>
+      <div class="stat-val"><span>Sống / Chết / Tổng:</span> <strong id="p2Nodes">1 / 0 / 1</strong></div>
+      <div class="stat-val"><span>Nhánh Base dùng:</span> <strong id="p2BaseBranches">0 / 6</strong></div>
+    </div>
+  </div>
+
+  <div id="actionLog" class="action-log">
+    Chọn 1 Node SỐNG của bạn để bắt đầu mở rộng mạng lưới.
+  </div>
+</div>
+
+<!-- Modal Rules (Clean HTML without Markdown/LaTeX artifacts) -->
+<div id="rulesModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Luật Chơi & Mechanics Game</h2>
+      <button class="close-btn" onclick="toggleModal('rulesModal', false)">&times;</button>
+    </div>
+    <div class="rules-body">
+      <div class="rules-section">
+        <h3>1. Thông Số Phát Triển</h3>
+        <ul>
+          <li><strong>Base (Đội Gốc)</strong>: Bán kính phát triển tối đa <span class="highlight-tag">4 ô</span>, tối đa <span class="highlight-tag">6 nhánh</span>.</li>
+          <li><strong>Node Thường</strong>: Bán kính phát triển tối đa <span class="highlight-tag">3 ô</span>, tối đa <span class="highlight-tag">4 nhánh</span>.</li>
+        </ul>
+      </div>
+      <div class="rules-section">
+        <h3>2. Quy Tắc Đặt Node, Cắt Đường & Chèn Đường</h3>
+        <ul>
+          <li><strong>Cắt đường đối thủ</strong>: Đặt Node mới hoặc tạo đường đè qua đường nối của <span class="highlight-tag" style="color:#f87171;">ĐỐI THỦ</span> &rarr; Đường của đối thủ bị <strong>CẮT ngay lập tức</strong>!</li>
+          <li><strong>Chèn đường đội nhà (Line Split)</strong>: Đặt Node mới nằm trên đường nối của <span class="highlight-tag" style="color:#60a5fa;">ĐỘI MÌNH</span> &rarr; Đường cũ tự động chia thành 2 đường nối với Node mới, đồng thời tự động liên kết cả 3 nhánh (Node nguồn và 2 đầu đường cũ).</li>
+          <li>Không đặt Node trùng vị trí Node cũ hoặc vẽ đường đâm xuyên trực tiếp qua Node đã có.</li>
+        </ul>
+      </div>
+      <div class="rules-section">
+        <h3>3. Hồi Sinh Node Chết & Mạch Vòng (Loops)</h3>
+        <ul>
+          <li>Nối từ Node SỐNG sang Node SỐNG khác cùng đội &rarr; Tạo vòng lặp dự phòng (Loop) nâng cao độ bền mạng lưới.</li>
+          <li>Nối từ Node SỐNG sang Node CHẾT cùng đội &rarr; <strong>HỒI SINH</strong> Node chết đó cùng toàn bộ nhánh con liên thông!</li>
+          <li><strong>Giới hạn Hồi sinh Direct</strong>: Node chỉ có thể nhận kết nối mới nếu số nhánh hiện tại nhỏ hơn giới hạn tối đa (Node thường &lt; 4 nhánh, Base &lt; 6 nhánh).</li>
+        </ul>
+      </div>
+      <div class="rules-section">
+        <h3>4. Điều Kiện Thắng</h3>
+        <ul>
+          <li>Đến lượt của bạn mà <strong>không còn nước đi hợp lệ</strong> (mọi Node sống đều hết nhánh hoặc không còn điểm đến) &rarr; bạn <strong>THUA</strong>.</li>
+          <li>Đường bị cắt vẫn nằm trên bàn và <strong>vẫn chiếm slot nhánh</strong> của hai đầu. Khi cả 6 slot của Base bị đường chết chiếm hết và không còn Node sống nào khác, Base bị "làm ngạt".</li>
+        </ul>
+      </div>
+      <div class="rules-section">
+        <h3>5. Hiển Thị Đồ Họa & Màu Sắc</h3>
+        <ul>
+          <li><strong>Đường Nối Sống</strong>: Hiển thị đúng màu đội (Xanh/Đỏ) kèm hiệu ứng phát sáng rực rỡ khi liên thông về Base.</li>
+          <li><strong>Node Chết Phân Loại Đội</strong>: Node chết của P1 có màu <span class="highlight-tag" style="color:#60a5fa;">Xanh Đậm (#1d4ed8)</span>, Node chết của P2 có màu <span class="highlight-tag" style="color:#f87171;">Đỏ Đậm (#b91c1c)</span>.</li>
+          <li><strong>Gợi Ý Nước Đi</strong>: Màu xanh lá (Tạo Node mới), Màu tím (Chèn đường đội nhà), Màu xanh dương (Mạch vòng Loop), Màu cam (Hồi sinh Node chết).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmation dialog -->
+<div id="resetModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 400px; text-align: center;">
+    <h2 style="color:#38bdf8; margin-bottom: 12px;">Xác Nhận Ván Mới</h2>
+    <p style="color:#cbd5e1; margin-bottom: 20px; font-size: 0.9rem;">Bạn có chắc chắn muốn khởi tạo lại ván đấu mới không?</p>
+    <div class="modal-actions" style="justify-content: center;">
+      <button class="btn" onclick="toggleModal('resetModal', false)">Hủy</button>
+      <button class="btn btn-primary" onclick="confirmReset()">Đồng Ý</button>
+    </div>
+  </div>
+</div>
+
+<script type="text/plain" id="botEngineSrc">
+var BotEngine = (function () {
+  'use strict';
+
+  // ---------------------------------------------------------------
+  //  NODE CUTTER BOT ENGINE
+  //  Mô phỏng nhanh luật chơi (sao chép đúng ngữ nghĩa evaluateGameState
+  //  của game) + tìm kiếm minimax nông có cắt tỉa + hàm đánh giá thế cờ.
+  // ---------------------------------------------------------------
+
+  var T_NEW = 0, T_LOOP = 1, T_RES = 2, T_SPLIT = 3;
+  var TYPE_NAMES = ['NEW', 'LOOP', 'RESURRECT', 'SPLIT'];
+  var WIN = 1e6;
+
+  function key(x, y) { return (x + 4096) * 8192 + (y + 4096); }
+  function gcd(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) { var t = a % b; a = b; b = t; }
+    return a;
+  }
+
+  function mkOffsets(r) {
+    var out = [];
+    for (var dx = -r; dx <= r; dx++) {
+      for (var dy = -r; dy <= r; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        if (dx * dx + dy * dy > r * r) continue;
+        var g = gcd(dx, dy);
+        out.push({ dx: dx, dy: dy, g: g, sx: dx / g, sy: dy / g });
+      }
+    }
+    return out;
+  }
+  var OFF3 = mkOffsets(3), OFF4 = mkOffsets(4);
+
+  // ---------------------- Trạng thái ----------------------------
+  function fromSnapshot(snap) {
+    var S = {
+      n: 0, m: 0,
+      X: [], Y: [], P: [], MAX: [], BASE: [], AL: [], DEG: [],
+      LA: [], LB: [], LP: [], LT: [], ACT: [],
+      time: snap.globalTime, turn: snap.player === 'P1' ? 0 : 1,
+      map: new Map(), base: [-1, -1]
+    };
+    var idx = {};
+    snap.nodes.forEach(function (nd, i) {
+      idx[nd.id] = i;
+      S.X.push(nd.gx); S.Y.push(nd.gy);
+      S.P.push(nd.player === 'P1' ? 0 : 1);
+      S.MAX.push(nd.maxBranches);
+      S.BASE.push(nd.isBase ? 1 : 0);
+      S.AL.push(nd.alive ? 1 : 0);
+      S.DEG.push(0);
+      S.map.set(key(nd.gx, nd.gy), i);
+      if (nd.isBase) S.base[S.P[i]] = i;
+    });
+    S.n = snap.nodes.length;
+    snap.lines.forEach(function (l) {
+      S.LA.push(idx[l.fromId]); S.LB.push(idx[l.toId]);
+      S.LP.push(l.player === 'P1' ? 0 : 1);
+      S.LT.push(l.time); S.ACT.push(l.active ? 1 : 0);
+    });
+    S.m = snap.lines.length;
+    recomputeDeg(S);
+    return S;
+  }
+
+  function recomputeDeg(S) {
+    var d = new Array(S.n);
+    for (var i = 0; i < S.n; i++) d[i] = 0;
+    for (var l = 0; l < S.m; l++) { d[S.LA[l]]++; d[S.LB[l]]++; }
+    S.DEG = d;
+  }
+
+  function clone(S) {
+    return {
+      n: S.n, m: S.m,
+      X: S.X.slice(), Y: S.Y.slice(), P: S.P.slice(), MAX: S.MAX.slice(),
+      BASE: S.BASE.slice(), AL: S.AL.slice(), DEG: S.DEG.slice(),
+      LA: S.LA.slice(), LB: S.LB.slice(), LP: S.LP.slice(), LT: S.LT.slice(), ACT: S.ACT.slice(),
+      time: S.time, turn: S.turn, map: S.map, base: S.base
+    };
+  }
+
+  // ---------------------- Hình học ------------------------------
+  function segInt(ax, ay, bx, by, cx, cy, dx, dy) {
+    if ((ax === cx && ay === cy) || (ax === dx && ay === dy) ||
+        (bx === cx && by === cy) || (bx === dx && by === dy)) return false;
+    var v1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    var v2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+    if (!((v1 > 0 && v2 < 0) || (v1 < 0 && v2 > 0))) return false;
+    var v3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+    var v4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+    return (v3 > 0 && v4 < 0) || (v3 < 0 && v4 > 0);
+  }
+
+  // ---------------------- Cập nhật sống/chết/cắt ----------------
+  function settle(S) {
+    var n = S.n, m = S.m, LA = S.LA, LB = S.LB, LP = S.LP, LT = S.LT, ACT = S.ACT,
+        AL = S.AL, X = S.X, Y = S.Y, P = S.P, BASE = S.BASE, map = S.map;
+    var l, i, o;
+
+    // Cắt bằng Node đối thủ nằm trên đường (độc lập sống/chết -> tính 1 lần)
+    var ncut = new Array(m);
+    for (l = 0; l < m; l++) {
+      ncut[l] = 0;
+      ACT[l] = 1;
+      var a0 = LA[l], b0 = LB[l];
+      var ddx = X[b0] - X[a0], ddy = Y[b0] - Y[a0];
+      var g = gcd(ddx, ddy);
+      if (g > 1) {
+        var sx = ddx / g, sy = ddy / g;
+        for (var k = 1; k < g; k++) {
+          var ix = map.get(key(X[a0] + k * sx, Y[a0] + k * sy));
+          if (ix !== undefined && P[ix] !== LP[l]) { ncut[l] = 1; break; }
+        }
+      }
+    }
+
+    for (var iter = 0; iter < 100; iter++) {
+      var changed = false;
+
+      // 1. Lan truyền sống từ Base theo các đường đang active
+      var nal = new Array(n);
+      for (i = 0; i < n; i++) nal[i] = BASE[i] ? 1 : 0;
+      var grew = true;
+      while (grew) {
+        grew = false;
+        for (l = 0; l < m; l++) {
+          if (!ACT[l]) continue;
+          var a = LA[l], b = LB[l];
+          if (nal[a] && !nal[b]) { nal[b] = 1; grew = true; }
+          else if (nal[b] && !nal[a]) { nal[a] = 1; grew = true; }
+        }
+      }
+      for (i = 0; i < n; i++) {
+        if (AL[i] !== nal[i]) { AL[i] = nal[i]; changed = true; }
+      }
+
+      // 2. Trạng thái active của từng đường (cập nhật tại chỗ, đúng thứ tự như game)
+      for (l = 0; l < m; l++) {
+        var cut = ncut[l];
+        if (!cut) {
+          var lp = LP[l], lt = LT[l], fa = LA[l], fb = LB[l];
+          var ax = X[fa], ay = Y[fa], bx = X[fb], by = Y[fb];
+          for (o = 0; o < m; o++) {
+            if (LP[o] === lp || LT[o] <= lt || !ACT[o]) continue;
+            var oa = LA[o], ob = LB[o];
+            if (!AL[oa] || !AL[ob]) continue;
+            if (segInt(ax, ay, bx, by, X[oa], Y[oa], X[ob], Y[ob])) { cut = 1; break; }
+          }
+        }
+        var na = cut ? 0 : 1;
+        if (ACT[l] !== na) { ACT[l] = na; changed = true; }
+      }
+      if (!changed) break;
+    }
+  }
+
+  // ---------------------- Sinh nước đi --------------------------
+  function connected(S, a, b) {
+    for (var l = 0; l < S.m; l++) {
+      if ((S.LA[l] === a && S.LB[l] === b) || (S.LA[l] === b && S.LB[l] === a)) return true;
+    }
+    return false;
+  }
+
+  function ownLinePoints(S, q) {
+    var set = new Set();
+    for (var l = 0; l < S.m; l++) {
+      if (S.LP[l] !== q || !S.ACT[l]) continue;
+      var a = S.LA[l], b = S.LB[l];
+      var dx = S.X[b] - S.X[a], dy = S.Y[b] - S.Y[a];
+      var g = gcd(dx, dy);
+      if (g > 1) {
+        var sx = dx / g, sy = dy / g;
+        for (var k = 1; k < g; k++) set.add(key(S.X[a] + k * sx, S.Y[a] + k * sy));
+      }
+    }
+    return set;
+  }
+
+  function scanNode(S, i, ownPts, out, anyOnly) {
+    var offs = S.BASE[i] ? OFF4 : OFF3;
+    var x0 = S.X[i], y0 = S.Y[i], q = S.P[i], map = S.map;
+    for (var k = 0; k < offs.length; k++) {
+      var o = offs[k], blocked = false;
+      for (var s = 1; s < o.g; s++) {
+        if (map.has(key(x0 + s * o.sx, y0 + s * o.sy))) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      var tx = x0 + o.dx, ty = y0 + o.dy;
+      var ex = map.get(key(tx, ty));
+      if (ex !== undefined) {
+        if (S.P[ex] === q && ex !== i && S.DEG[ex] < S.MAX[ex] && !connected(S, i, ex)) {
+          if (anyOnly) return true;
+          out.push({ src: i, x: tx, y: ty, dest: ex, type: S.AL[ex] ? T_LOOP : T_RES });
+        }
+      } else {
+        if (anyOnly) return true;
+        out.push({ src: i, x: tx, y: ty, dest: -1, type: (ownPts && ownPts.has(key(tx, ty))) ? T_SPLIT : T_NEW });
+      }
+    }
+    return false;
+  }
+
+  function genMoves(S, q) {
+    var out = [];
+    var ownPts = ownLinePoints(S, q);
+    for (var i = 0; i < S.n; i++) {
+      if (S.P[i] !== q || !S.AL[i] || S.DEG[i] >= S.MAX[i]) continue;
+      scanNode(S, i, ownPts, out, false);
+    }
+    return out;
+  }
+
+  function hasMove(S, q) {
+    for (var i = 0; i < S.n; i++) {
+      if (S.P[i] !== q || !S.AL[i] || S.DEG[i] >= S.MAX[i]) continue;
+      if (scanNode(S, i, null, null, true)) return true;
+    }
+    return false;
+  }
+
+  // ---------------------- Thực hiện nước đi ---------------------
+  function applyMove(S, mv) {
+    var q = S.turn;
+    var C = clone(S);
+    var dest = mv.dest, l;
+    if (dest < 0) {
+      dest = C.n;
+      C.X.push(mv.x); C.Y.push(mv.y); C.P.push(q); C.MAX.push(4);
+      C.BASE.push(0); C.AL.push(1); C.DEG.push(0);
+      C.n++;
+      S.map.set(key(mv.x, mv.y), dest);
+
+      var hit = [];
+      for (l = 0; l < C.m; l++) {
+        if (C.LP[l] !== q || !C.ACT[l]) continue;
+        var a = C.LA[l], b = C.LB[l];
+        var dx = C.X[b] - C.X[a], dy = C.Y[b] - C.Y[a];
+        var g = gcd(dx, dy);
+        if (g > 1) {
+          var sx = dx / g, sy = dy / g;
+          for (var k = 1; k < g; k++) {
+            if (C.X[a] + k * sx === mv.x && C.Y[a] + k * sy === mv.y) { hit.push(l); break; }
+          }
+        }
+      }
+      if (hit.length) {
+        var hs = {};
+        hit.forEach(function (h) { hs[h] = 1; });
+        var LA = [], LB = [], LP = [], LT = [], ACT = [];
+        for (l = 0; l < C.m; l++) {
+          if (hs[l]) continue;
+          LA.push(C.LA[l]); LB.push(C.LB[l]); LP.push(C.LP[l]); LT.push(C.LT[l]); ACT.push(C.ACT[l]);
+        }
+        hit.forEach(function (h) {
+          LA.push(C.LA[h]); LB.push(dest); LP.push(q); LT.push(C.LT[h]); ACT.push(1);
+          LA.push(dest); LB.push(C.LB[h]); LP.push(q); LT.push(C.LT[h]); ACT.push(1);
+        });
+        C.LA = LA; C.LB = LB; C.LP = LP; C.LT = LT; C.ACT = ACT; C.m = LA.length;
+      }
+    }
+    C.time++;
+    C.LA.push(mv.src); C.LB.push(dest); C.LP.push(q); C.LT.push(C.time); C.ACT.push(1);
+    C.m++;
+    recomputeDeg(C);
+    C.turn = 1 - q;
+    settle(C);
+    return C;
+  }
+
+  function release(S, mv) {
+    if (mv.dest < 0) S.map.delete(key(mv.x, mv.y));
+  }
+
+  // ---------------------- Đánh giá thế cờ -----------------------
+  function feat(S, q) {
+    var A = 0, D = 0, free = 0, minD = 99, cutBase = 0, activeBase = 0, aliveLines = 0, deadLines = 0;
+    var b = S.base[q], e = S.base[1 - q];
+    var ex = S.X[e], ey = S.Y[e], i, l;
+    for (i = 0; i < S.n; i++) {
+      if (S.P[i] !== q) continue;
+      if (S.AL[i]) {
+        A++;
+        free += S.MAX[i] - S.DEG[i];
+        var dx = S.X[i] - ex, dy = S.Y[i] - ey;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < minD) minD = d;
+      } else D++;
+    }
+    for (l = 0; l < S.m; l++) {
+      if (S.LP[l] !== q) continue;
+      if (!S.ACT[l]) deadLines++;
+      else if (S.AL[S.LA[l]] && S.AL[S.LB[l]]) aliveLines++;
+      if (S.LA[l] === b || S.LB[l] === b) {
+        if (S.ACT[l]) activeBase++; else cutBase++;
+      }
+    }
+    return {
+      A: A, D: D, free: free, minD: minD, cutBase: cutBase, activeBase: activeBase,
+      deadLines: deadLines, cyc: Math.max(0, aliveLines - (A - 1)),
+      baseFree: S.MAX[b] - S.DEG[b]
+    };
+  }
+
+  function danger(c) { return c * 1.0 + c * c * 0.35; }
+  function lowMob(f) { return f <= 3 ? (4 - f) * (4 - f) * 1.2 : 0; }
+
+  var evalCount = 0;
+  function evaluate(S, me) {
+    evalCount++;
+    var opp = 1 - me;
+    var f0 = feat(S, me), f1 = feat(S, opp);
+    // Điều kiện thắng: đến lượt mà hết nước đi
+    if (S.turn === opp && f1.free <= 3 && !hasMove(S, opp)) return WIN;
+    if (S.turn === me && f0.free <= 3 && !hasMove(S, me)) return -WIN;
+
+    var s = 0;
+    s += (f0.A - f1.A) * 1.0;
+    s += (f1.D - f0.D) * 0.35;
+    s += danger(f1.cutBase) - danger(f0.cutBase);
+    s += lowMob(f1.free) - lowMob(f0.free);
+    s += 0.08 * (f0.free - f1.free);
+    s += 0.45 * (Math.min(f0.cyc, 3) - Math.min(f1.cyc, 3));
+    s += 0.2 * (f0.baseFree - f1.baseFree);
+    s += -Math.max(0, f0.minD - 4) * 0.18 + Math.max(0, f1.minD - 4) * 0.18;
+    return s;
+  }
+
+  // ---------------------- Tìm kiếm ------------------------------
+  function toOut(snap, S, mv, extra) {
+    var r = {
+      srcId: snap.nodes[mv.src].id,
+      gx: mv.x, gy: mv.y,
+      existingNodeId: mv.dest >= 0 ? snap.nodes[mv.dest].id : null,
+      type: TYPE_NAMES[mv.type]
+    };
+    if (extra) for (var k in extra) r[k] = extra[k];
+    return r;
+  }
+
+  function sameMove(a, b) { return a.src === b.src && a.x === b.x && a.y === b.y; }
+
+  // Giá trị 2 lớp: đối thủ chọn phản đòn tệ nhất cho `me`.
+  // alpha: nếu tìm thấy phản đòn <= alpha thì dừng sớm (không thể vượt best).
+  // keepWorst: trả về K phản đòn xấu nhất (phục vụ tìm kiếm lớp 3).
+  function minReply(C, me, alpha, killers, keepWorst, deadline) {
+    var opp = 1 - me;
+    var replies = genMoves(C, opp);
+    if (!replies.length) return { v: WIN, worst: [] };
+    // ưu tiên "killer" trước để cắt tỉa sớm
+    if (killers && killers.length) {
+      var front = [], rest = [];
+      replies.forEach(function (r) {
+        var isK = false;
+        for (var i = 0; i < killers.length; i++) if (sameMove(r, killers[i])) { isK = true; break; }
+        (isK ? front : rest).push(r);
+      });
+      replies = front.concat(rest);
+    }
+    var worstV = Infinity, worstMv = null, list = keepWorst ? [] : null;
+    for (var i = 0; i < replies.length; i++) {
+      var r = replies[i];
+      var C2 = applyMove(C, r);
+      var v = evaluate(C2, me);
+      release(C, r);
+      if (v < worstV) { worstV = v; worstMv = r; }
+      if (list) list.push({ mv: r, v: v });
+      if (!keepWorst && worstV <= alpha) break;
+    }
+    if (killers && worstMv) {
+      killers.unshift(worstMv);
+      if (killers.length > 4) killers.pop();
+    }
+    var out = { v: worstV, worst: [] };
+    if (list) {
+      list.sort(function (a, b) { return a.v - b.v; });
+      out.worst = list;
+    }
+    return out;
+  }
+
+  // Lớp 3: sau phản đòn của đối thủ, `me` chọn nước tốt nhất.
+  function maxReply(C, me) {
+    var opp = 1 - me;
+    var moves = genMoves(C, me);
+    if (!moves.length) return -WIN;
+    var best = -Infinity;
+    for (var i = 0; i < moves.length; i++) {
+      var C2 = applyMove(C, moves[i]);
+      var v = evaluate(C2, me);
+      release(C, moves[i]);
+      if (v > best) best = v;
+      if (best >= WIN) break;
+    }
+    return best;
+  }
+
+  var LEVELS = [
+    { name: 'Dễ', depth: 0 },
+    { name: 'Vừa', depth: 1 },
+    { name: 'Khó', depth: 2, k1: 12, ms: 2500 },
+    { name: 'Cao thủ', depth: 3, k1: 12, kRefine: 4, k2: 3, ms: 5000 }
+  ];
+
+  function chooseMove(snap, level, opts) {
+    opts = opts || {};
+    var rng = opts.rng || Math.random;
+    var t0 = Date.now();
+    evalCount = 0;
+    var cfg = LEVELS[Math.max(0, Math.min(LEVELS.length - 1, level | 0))];
+    if (opts.timeMs) cfg = Object.assign({}, cfg, { ms: opts.timeMs });
+    var S = fromSnapshot(snap);
+    var me = S.turn, opp = 1 - me;
+    var moves = genMoves(S, me);
+    if (!moves.length) return null;
+    var deadline = t0 + (cfg.ms || 1000);
+
+    // Lớp 1: đánh giá tĩnh mọi nước đi + phát hiện nước thắng ngay
+    var scored = [];
+    for (var i = 0; i < moves.length; i++) {
+      var C = applyMove(S, moves[i]);
+      var sc = evaluate(C, me);
+      release(S, moves[i]);
+      if (sc >= WIN) return toOut(snap, S, moves[i], { score: sc, ms: Date.now() - t0, evals: evalCount, note: 'thắng ngay' });
+      scored.push({ mv: moves[i], sc: sc });
+    }
+
+    function pack(item, note) {
+      return toOut(snap, S, item.mv, { score: item.sc, ms: Date.now() - t0, evals: evalCount, note: note || '' });
+    }
+
+    if (cfg.depth === 0) {
+      scored.sort(function (a, b) { return b.sc - a.sc; });
+      var pool = rng() < 0.4 ? scored : scored.slice(0, Math.min(8, scored.length));
+      // Dễ vẫn không đi nước tự sát: loại các nước đẩy điểm xuống rất thấp
+      return pack(pool[Math.floor(rng() * pool.length)], 'ngẫu nhiên');
+    }
+
+    scored.forEach(function (it) { it.sc += (rng() - 0.5) * 0.4; });
+    scored.sort(function (a, b) { return b.sc - a.sc; });
+
+    if (cfg.depth === 1) return pack(scored[0], 'tham lam');
+
+    // Lớp 2 (và 3): chỉ xét K1 nước đầu theo điểm tĩnh
+    var K1 = Math.min(cfg.k1, scored.length);
+    var killers = [];
+    var results = [];
+    var best = -Infinity;
+    for (var r = 0; r < K1; r++) {
+      if (r > 0 && Date.now() > deadline) break;
+      var item = scored[r];
+      var Cr = applyMove(S, item.mv);
+      var res = minReply(Cr, me, cfg.depth === 3 ? -Infinity : best, killers, cfg.depth === 3, deadline);
+      release(S, item.mv);
+      var val = res.v + (rng() - 0.5) * 0.1;
+      results.push({ item: item, v: val, worst: res.worst });
+      if (val > best) best = val;
+    }
+    results.sort(function (a, b) { return b.v - a.v; });
+
+    if (cfg.depth === 2) {
+      return pack({ mv: results[0].item.mv, sc: results[0].v }, 'độ sâu 2');
+    }
+
+    // Lớp 3: tinh chỉnh vài ứng viên tốt nhất
+    var refineN = Math.min(cfg.kRefine, results.length);
+    var bestRes = null, bestV = -Infinity;
+    for (var q2 = 0; q2 < refineN; q2++) {
+      if (q2 > 0 && Date.now() > deadline) break;
+      var cand = results[q2];
+      var Cc = applyMove(S, cand.item.mv);
+      var worstThree = Infinity;
+      var rep = cand.worst.slice(0, cfg.k2);
+      for (var w = 0; w < rep.length; w++) {
+        var Cd = applyMove(Cc, rep[w].mv);
+        var v3 = maxReply(Cd, me);
+        release(Cc, rep[w].mv);
+        if (v3 < worstThree) worstThree = v3;
+        if (worstThree <= bestV) break;
+      }
+      release(S, cand.item.mv);
+      if (worstThree === Infinity) worstThree = cand.v;
+      if (worstThree > bestV) { bestV = worstThree; bestRes = cand; }
+    }
+    if (!bestRes) bestRes = results[0];
+    return pack({ mv: bestRes.item.mv, sc: bestV }, 'độ sâu 3');
+  }
+
+  return {
+    chooseMove: chooseMove,
+    LEVELS: LEVELS,
+    // phục vụ kiểm thử
+    _internals: { fromSnapshot: fromSnapshot, genMoves: genMoves, applyMove: applyMove, release: release, hasMove: hasMove, evaluate: evaluate, settle: settle, TYPE_NAMES: TYPE_NAMES }
+  };
+})();
+
+</script>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let CELL_SIZE = 40;
+  let camera = { x: 0, y: 0, zoom: 1 };
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let hasDragged = false;
+
+  let currentPlayer = 'P1';
+  let globalTime = 0;
+  let selectedNode = null;
+  let validTargets = [];
+
+  let nodes = [];
+  let lines = [];
+  let gameOver = false;
+
+  // --- Bot state ---
+  let gameMode = 'pvp';
+  let botLevel = 2;
+  let botBusy = false;
+  let botToken = 0;
+
+  const COLORS = {
+    bg: '#0f172a',
+    grid: '#1e293b',
+    gridAxis: '#334155',
+    P1Live: '#3b82f6',
+    P1Dead: '#1d4ed8',
+    P1Stroke: '#60a5fa',
+    P2Live: '#ef4444',
+    P2Dead: '#b91c1c',
+    P2Stroke: '#f87171',
+    deadLine: '#64748b',
+    targetNew: '#10b981',
+    targetSplit: '#a855f7',
+    targetLoop: '#38bdf8',
+    targetResurrect: '#f59e0b'
+  };
+
+  function initGame() {
+    nodes = [
+      { id: 'b1', gx: -8, gy: 0, player: 'P1', isBase: true, maxBranches: 6, alive: true },
+      { id: 'b2', gx: 8, gy: 0, player: 'P2', isBase: true, maxBranches: 6, alive: true }
+    ];
+    lines = [];
+    currentPlayer = 'P1';
+    globalTime = 0;
+    selectedNode = null;
+    validTargets = [];
+    gameOver = false;
+    botToken++;
+    botBusy = false;
+
+    recenterMap();
+    evaluateGameState();
+    updateUI();
+    scheduleBot();
+  }
+
+  function recenterMap() {
+    camera.x = canvas.width / 2;
+    camera.y = canvas.height / 2;
+    camera.zoom = 1;
+    draw();
+  }
+
+  function gridToScreen(gx, gy) {
+    return {
+      x: camera.x + gx * CELL_SIZE * camera.zoom,
+      y: camera.y + gy * CELL_SIZE * camera.zoom
+    };
+  }
+
+  function screenToGrid(sx, sy) {
+    return {
+      gx: Math.round((sx - camera.x) / (CELL_SIZE * camera.zoom)),
+      gy: Math.round((sy - camera.y) / (CELL_SIZE * camera.zoom))
+    };
+  }
+
+  function distSq(x1, y1, x2, y2) {
+    return (x1 - x2) ** 2 + (y1 - y2) ** 2;
+  }
+
+  function linePassesThroughNode(A, B, K) {
+    const cross = (B.gx - A.gx) * (K.gy - A.gy) - (B.gy - A.gy) * (K.gx - A.gx);
+    if (cross !== 0) return false;
+    const dot = (K.gx - A.gx) * (B.gx - A.gx) + (K.gy - A.gy) * (B.gy - A.gy);
+    if (dot <= 0) return false;
+    const sqLen = distSq(A.gx, A.gy, B.gx, B.gy);
+    if (dot >= sqLen) return false;
+    return true;
+  }
+
+  function crossProduct(P1, P2, P3) {
+    return (P2.gx - P1.gx) * (P3.gy - P1.gy) - (P2.gy - P1.gy) * (P3.gx - P1.gx);
+  }
+
+  function segmentsIntersect(A, B, C, D) {
+    if ((A.gx === C.gx && A.gy === C.gy) || (A.gx === D.gx && A.gy === D.gy) ||
+        (B.gx === C.gx && B.gy === C.gy) || (B.gx === D.gx && B.gy === D.gy)) {
+      return false;
+    }
+    const v1 = crossProduct(A, B, C);
+    const v2 = crossProduct(A, B, D);
+    const v3 = crossProduct(C, D, A);
+    const v4 = crossProduct(C, D, B);
+
+    return ((v1 > 0 && v2 < 0) || (v1 < 0 && v2 > 0)) &&
+           ((v3 > 0 && v4 < 0) || (v3 < 0 && v4 > 0));
+  }
+
+  function getNodeBranchCount(nodeId) {
+    return lines.filter(l => l.fromId === nodeId || l.toId === nodeId).length;
+  }
+
+  function evaluateGameState() {
+    lines.forEach(l => l.active = true);
+
+    let changed = true;
+    let iter = 0;
+
+    while (changed && iter < 100) {
+      changed = false;
+      iter++;
+
+      // 1. Trace alive reachable nodes from Base
+      const aliveSetP1 = new Set();
+      const aliveSetP2 = new Set();
+
+      const b1 = nodes.find(n => n.isBase && n.player === 'P1');
+      if (b1) {
+        aliveSetP1.add(b1.id);
+        const q = [b1.id];
+        while (q.length > 0) {
+          const curr = q.shift();
+          lines.forEach(l => {
+            if (l.player !== 'P1' || !l.active) return;
+            let next = null;
+            if (l.fromId === curr) next = l.toId;
+            else if (l.toId === curr) next = l.fromId;
+
+            if (next && !aliveSetP1.has(next)) {
+              aliveSetP1.add(next);
+              q.push(next);
+            }
+          });
+        }
+      }
+
+      const b2 = nodes.find(n => n.isBase && n.player === 'P2');
+      if (b2) {
+        aliveSetP2.add(b2.id);
+        const q = [b2.id];
+        while (q.length > 0) {
+          const curr = q.shift();
+          lines.forEach(l => {
+            if (l.player !== 'P2' || !l.active) return;
+            let next = null;
+            if (l.fromId === curr) next = l.toId;
+            else if (l.toId === curr) next = l.fromId;
+
+            if (next && !aliveSetP2.has(next)) {
+              aliveSetP2.add(next);
+              q.push(next);
+            }
+          });
+        }
+      }
+
+      // Update Node Alive Status
+      nodes.forEach(n => {
+        const isAliveNow = n.player === 'P1' ? aliveSetP1.has(n.id) : aliveSetP2.has(n.id);
+        if (n.alive !== isAliveNow) {
+          n.alive = isAliveNow;
+          changed = true;
+        }
+      });
+
+      // 2. Evaluate Line Active / Cut Status
+      lines.forEach(l => {
+        const fromN = nodes.find(n => n.id === l.fromId);
+        const toN = nodes.find(n => n.id === l.toId);
+        if (!fromN || !toN) {
+          if (l.active) { l.active = false; changed = true; }
+          return;
+        }
+
+        let isCut = false;
+
+        // Opponent nodes placed on line cause a cut
+        for (const n of nodes) {
+          if (n.id === l.fromId || n.id === l.toId) continue;
+          if (n.player !== l.player && linePassesThroughNode(fromN, toN, n)) {
+            isCut = true;
+            break;
+          }
+        }
+
+        // Check if cut by opponent active crossing line
+        if (!isCut) {
+          for (const oppL of lines) {
+            if (oppL.player === l.player || oppL.id === l.id) continue;
+            if (oppL.time <= l.time) continue; // Only newer lines cut older lines
+            if (!oppL.active) continue;
+
+            const oppFrom = nodes.find(n => n.id === oppL.fromId);
+            const oppTo = nodes.find(n => n.id === oppL.toId);
+
+            if (oppFrom && oppTo && oppFrom.alive && oppTo.alive) {
+              if (segmentsIntersect(fromN, toN, oppFrom, oppTo)) {
+                isCut = true;
+                break;
+              }
+            }
+          }
+        }
+
+        const newActive = !isCut;
+        if (l.active !== newActive) {
+          l.active = newActive;
+          changed = true;
+        }
+      });
+    }
+  }
+
+  function computeValidTargets(srcNode) {
+    if (!srcNode || !srcNode.alive || srcNode.player !== currentPlayer) return [];
+    if (getNodeBranchCount(srcNode.id) >= srcNode.maxBranches) return [];
+
+    const radius = srcNode.isBase ? 4 : 3;
+    const rSq = radius * radius;
+    const targets = [];
+
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        if (dx * dx + dy * dy > rSq) continue;
+
+        const tgx = srcNode.gx + dx;
+        const tgy = srcNode.gy + dy;
+        const targetCoord = { gx: tgx, gy: tgy };
+
+        // Check if new line passes through existing nodes
+        let passesNode = false;
+        for (let n of nodes) {
+          if ((n.gx === srcNode.gx && n.gy === srcNode.gy) || (n.gx === tgx && n.gy === tgy)) continue;
+          if (linePassesThroughNode(srcNode, targetCoord, n)) {
+            passesNode = true;
+            break;
+          }
+        }
+        if (passesNode) continue;
+
+        const existingNode = nodes.find(n => n.gx === tgx && n.gy === tgy);
+        if (existingNode) {
+          // Connecting to existing node (OWN TEAM ONLY)
+          if (existingNode.player === currentPlayer && existingNode.id !== srcNode.id) {
+            const targetBranchCount = getNodeBranchCount(existingNode.id);
+
+            if (targetBranchCount < existingNode.maxBranches) {
+              const alreadyConnected = lines.some(l =>
+                (l.fromId === srcNode.id && l.toId === existingNode.id) ||
+                (l.fromId === existingNode.id && l.toId === srcNode.id)
+              );
+              if (!alreadyConnected) {
+                targets.push({
+                  gx: tgx,
+                  gy: tgy,
+                  existingNodeId: existingNode.id,
+                  type: existingNode.alive ? 'LOOP' : 'RESURRECT'
+                });
+              }
+            }
+          }
+        } else {
+          // Check if coordinate lies directly on an existing active line of currentPlayer
+          const isOnOwnLine = lines.some(l => {
+            if (l.player !== currentPlayer || !l.active) return false;
+            const fn = nodes.find(n => n.id === l.fromId);
+            const tn = nodes.find(n => n.id === l.toId);
+            if (!fn || !tn) return false;
+            return linePassesThroughNode(fn, tn, targetCoord);
+          });
+
+          targets.push({
+            gx: tgx,
+            gy: tgy,
+            existingNodeId: null,
+            type: isOnOwnLine ? 'SPLIT' : 'NEW'
+          });
+        }
+      }
+    }
+    return targets;
+  }
+
+  function handleCanvasClick(e) {
+    if (gameOver || hasDragged || botBusy || isBot(currentPlayer)) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const { gx, gy } = screenToGrid(clickX, clickY);
+
+    // 1. Target Node / Grid Point Clicked
+    const targetHit = validTargets.find(t => t.gx === gx && t.gy === gy);
+    if (targetHit && selectedNode) {
+      executeMove(selectedNode, targetHit);
+      return;
+    }
+
+    // 2. Source Node Clicked
+    const clickedNode = nodes.find(n => n.gx === gx && n.gy === gy);
+    if (clickedNode && clickedNode.player === currentPlayer) {
+      if (!clickedNode.alive) {
+        logAction(`Node (${clickedNode.gx}, ${clickedNode.gy}) đã CHẾT. Hãy dùng 1 Node SỐNG khác nối tới để hồi sinh!`);
+        return;
+      }
+      if (getNodeBranchCount(clickedNode.id) >= clickedNode.maxBranches) {
+        logAction(`Node này đã đạt tối đa ${clickedNode.maxBranches} nhánh!`);
+        return;
+      }
+      selectedNode = clickedNode;
+      validTargets = computeValidTargets(selectedNode);
+      if (validTargets.length === 0) {
+        logAction("Node này không còn hướng phát triển hợp lệ nào.");
+      } else {
+        const radStr = selectedNode.isBase ? "4 ô (Base)" : "3 ô";
+        logAction(`Đã chọn Node (${selectedNode.gx}, ${selectedNode.gy}) - Bán kính ${radStr}. Chọn điểm gợi ý để nối.`);
+      }
+      draw();
+    } else if (clickedNode) {
+      logAction(`Đây là Node của đối thủ (${clickedNode.player}). Hãy chọn Node của đội mình.`);
+      selectedNode = null;
+      validTargets = [];
+      draw();
+    } else {
+      selectedNode = null;
+      validTargets = [];
+      logAction("Hãy chọn 1 Node SỐNG của bạn để phát triển.");
+      draw();
+    }
+  }
+
+  function executeMove(src, target) {
+    let destNodeId = target.existingNodeId;
+    let actionLogText = "";
+
+    if (!destNodeId) {
+      destNodeId = 'n_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      nodes.push({
+        id: destNodeId,
+        gx: target.gx,
+        gy: target.gy,
+        player: currentPlayer,
+        isBase: false,
+        maxBranches: 4,
+        alive: true
+      });
+
+      // Check if target coordinate lies on any existing active lines of currentPlayer
+      const targetCoord = { gx: target.gx, gy: target.gy };
+      const linesToSplit = lines.filter(l => {
+        if (l.player !== currentPlayer || !l.active) return false;
+        const fn = nodes.find(n => n.id === l.fromId);
+        const tn = nodes.find(n => n.id === l.toId);
+        if (!fn || !tn) return false;
+        return linePassesThroughNode(fn, tn, targetCoord);
+      });
+
+      if (linesToSplit.length > 0) {
+        const splitIds = new Set(linesToSplit.map(l => l.id));
+        lines = lines.filter(l => !splitIds.has(l.id));
+
+        linesToSplit.forEach(l => {
+          lines.push({
+            id: 'l_sp1_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            fromId: l.fromId,
+            toId: destNodeId,
+            player: currentPlayer,
+            time: l.time,
+            active: true
+          });
+          lines.push({
+            id: 'l_sp2_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            fromId: destNodeId,
+            toId: l.toId,
+            player: currentPlayer,
+            time: l.time,
+            active: true
+          });
+        });
+        actionLogText = `Chèn Node mới tại (${target.gx}, ${target.gy}) chia đôi đường đội nhà (Tự động nối 3 nhánh)!`;
+      } else {
+        actionLogText = `Đã tạo Node mới tại (${target.gx}, ${target.gy}).`;
+      }
+    } else {
+      if (target.type === 'RESURRECT') {
+        actionLogText = `HỒI SINH THÀNH CÔNG Node (${target.gx}, ${target.gy})!`;
+      } else {
+        actionLogText = `Tạo mạch vòng (Loop) kết nối với (${target.gx}, ${target.gy}).`;
+      }
+    }
+
+    // Always create direct line from src to destNodeId
+    lines.push({
+      id: 'l_' + Date.now(),
+      fromId: src.id,
+      toId: destNodeId,
+      player: currentPlayer,
+      time: ++globalTime,
+      active: true
+    });
+
+    evaluateGameState();
+
+    const opp = currentPlayer === 'P1' ? 'P2' : 'P1';
+    selectedNode = null;
+    validTargets = [];
+
+    // Điều kiện thắng: đối thủ hết nước đi hợp lệ ở lượt của họ
+    if (!playerHasLegalMove(opp)) {
+      gameOver = true;
+      logAction(`🎉 GAME OVER! ${currentPlayer === 'P1' ? 'Người chơi 1 (Xanh)' : 'Người chơi 2 (Đỏ)'} THẮNG! (Đối thủ hết nước đi hợp lệ)`);
+    } else {
+      currentPlayer = opp;
+      logAction(`${actionLogText} Đến lượt ${currentPlayer === 'P1' ? 'Người chơi 1 (Xanh)' : 'Người chơi 2 (Đỏ)'}.`);
+    }
+
+    updateUI();
+    draw();
+    scheduleBot();
+  }
+
+  function playerHasLegalMove(pl) {
+    const saved = currentPlayer;
+    currentPlayer = pl;
+    let ok = false;
+    for (const n of nodes) {
+      if (n.player === pl && n.alive && computeValidTargets(n).length > 0) { ok = true; break; }
+    }
+    currentPlayer = saved;
+    return ok;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const zoom = camera.zoom;
+    const scaledCell = CELL_SIZE * zoom;
+
+    // Draw Endless Grid
+    ctx.lineWidth = 1;
+    const startX = (camera.x % scaledCell) - scaledCell;
+    const endX = canvas.width + scaledCell;
+    const startY = (camera.y % scaledCell) - scaledCell;
+    const endY = canvas.height + scaledCell;
+
+    for (let x = startX; x < endX; x += scaledCell) {
+      ctx.strokeStyle = Math.abs(x - camera.x) < 2 ? COLORS.gridAxis : COLORS.grid;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = startY; y < endY; y += scaledCell) {
+      ctx.strokeStyle = Math.abs(y - camera.y) < 2 ? COLORS.gridAxis : COLORS.grid;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Draw Line Connections
+    lines.forEach(l => {
+      const fromN = nodes.find(n => n.id === l.fromId);
+      const toN = nodes.find(n => n.id === l.toId);
+      if (!fromN || !toN) return;
+
+      const p1 = gridToScreen(fromN.gx, fromN.gy);
+      const p2 = gridToScreen(toN.gx, toN.gy);
+
+      const isAliveConnection = l.active && fromN.alive && toN.alive;
+
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+
+      if (isAliveConnection) {
+        ctx.strokeStyle = l.player === 'P1' ? COLORS.P1Live : COLORS.P2Live;
+        ctx.lineWidth = 3.5 * zoom;
+        ctx.setLineDash([]);
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 12 * zoom;
+      } else {
+        ctx.strokeStyle = COLORS.deadLine;
+        ctx.lineWidth = 2 * zoom;
+        ctx.setLineDash([6 * zoom, 4 * zoom]);
+        ctx.shadowBlur = 0;
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+    });
+
+    // Draw Target Move Indicators
+    validTargets.forEach(t => {
+      const pos = gridToScreen(t.gx, t.gy);
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 8 * zoom, 0, Math.PI * 2);
+
+      if (t.type === 'NEW') ctx.fillStyle = COLORS.targetNew;
+      else if (t.type === 'SPLIT') ctx.fillStyle = COLORS.targetSplit;
+      else if (t.type === 'LOOP') ctx.fillStyle = COLORS.targetLoop;
+      else ctx.fillStyle = COLORS.targetResurrect;
+
+      ctx.fill();
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 12 * zoom;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5 * zoom;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
+    // Draw Nodes
+    nodes.forEach(n => {
+      const pos = gridToScreen(n.gx, n.gy);
+      const radius = (n.isBase ? 14 : 9) * zoom;
+
+      ctx.beginPath();
+      if (n.isBase) {
+        ctx.rect(pos.x - radius, pos.y - radius, radius * 2, radius * 2);
+      } else {
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+      }
+
+      if (n.alive) {
+        ctx.fillStyle = n.player === 'P1' ? COLORS.P1Live : COLORS.P2Live;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 14 * zoom;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5 * zoom;
+      } else {
+        // Distinct Dark Colors for Dead Nodes per Team
+        ctx.fillStyle = n.player === 'P1' ? COLORS.P1Dead : COLORS.P2Dead;
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = n.player === 'P1' ? COLORS.P1Stroke : COLORS.P2Stroke;
+        ctx.lineWidth = 2 * zoom;
+      }
+
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Highlight Ring on Selected Node
+      if (selectedNode && selectedNode.id === n.id) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3.5 * zoom;
+        ctx.stroke();
+      }
+
+      // Base Label
+      if (n.isBase) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${11 * zoom}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.player, pos.x, pos.y);
+      }
+    });
+  }
+
+  function updateUI() {
+    const badge = document.getElementById('turnBadge');
+    const dot = document.getElementById('dotIndicator');
+    const text = document.getElementById('turnText');
+
+    if (currentPlayer === 'P1') {
+      badge.className = 'turn-badge turn-p1';
+      dot.className = 'dot-indicator p1-dot';
+      text.innerText = 'Lượt: Người chơi 1 (Xanh)';
+    } else {
+      badge.className = 'turn-badge turn-p2';
+      dot.className = 'dot-indicator p2-dot';
+      text.innerText = 'Lượt: Người chơi 2 (Đỏ)';
+    }
+
+    const p1Alive = nodes.filter(n => n.player === 'P1' && n.alive).length;
+    const p1Dead = nodes.filter(n => n.player === 'P1' && !n.alive).length;
+    const p1Total = nodes.filter(n => n.player === 'P1').length;
+
+    const p2Alive = nodes.filter(n => n.player === 'P2' && n.alive).length;
+    const p2Dead = nodes.filter(n => n.player === 'P2' && !n.alive).length;
+    const p2Total = nodes.filter(n => n.player === 'P2').length;
+
+    document.getElementById('p1Nodes').innerText = `${p1Alive} / ${p1Dead} / ${p1Total}`;
+    document.getElementById('p2Nodes').innerText = `${p2Alive} / ${p2Dead} / ${p2Total}`;
+
+    document.getElementById('p1BaseBranches').innerText = `${getNodeBranchCount('b1')} / 6`;
+    document.getElementById('p2BaseBranches').innerText = `${getNodeBranchCount('b2')} / 6`;
+  }
+
+  function logAction(msg) {
+    document.getElementById('actionLog').innerText = msg;
+  }
+
+  function toggleModal(id, show) {
+    document.getElementById(id).classList.toggle('active', show);
+  }
+
+  function promptReset() {
+    toggleModal('resetModal', true);
+  }
+
+  function confirmReset() {
+    toggleModal('resetModal', false);
+    initGame();
+  }
+
+
+  // ================== BOT ==================
+  function isBot(player) {
+    if (gameMode === 'bvb') return true;
+    if (gameMode === 'hvb') return player === 'P2';
+    if (gameMode === 'bvh') return player === 'P1';
+    return false;
+  }
+
+  function onBotSettingsChange() {
+    gameMode = document.getElementById('modeSelect').value;
+    botLevel = parseInt(document.getElementById('levelSelect').value, 10);
+    botToken++;          // huỷ mọi nước đang tính dở
+    botBusy = false;
+    selectedNode = null;
+    validTargets = [];
+    draw();
+    scheduleBot();
+  }
+
+  function scheduleBot() {
+    if (gameOver || botBusy || !isBot(currentPlayer)) return;
+    botBusy = true;
+    const token = botToken;
+    logAction('🤖 Bot đang suy nghĩ...');
+    setTimeout(() => {
+      if (token !== botToken) return;
+      requestBotMove(token);
+    }, 350);
+  }
+
+  function buildSnapshot() {
+    return {
+      player: currentPlayer,
+      globalTime: globalTime,
+      nodes: nodes.map(n => ({ id: n.id, gx: n.gx, gy: n.gy, player: n.player, isBase: !!n.isBase, maxBranches: n.maxBranches, alive: !!n.alive })),
+      lines: lines.map(l => ({ id: l.id, fromId: l.fromId, toId: l.toId, player: l.player, time: l.time, active: !!l.active }))
+    };
+  }
+
+  let botWorker = null;
+  let botWorkerBroken = false;
+  let botSyncEngine = null;
+
+  function botEngineSource() {
+    return document.getElementById('botEngineSrc').textContent;
+  }
+
+  function runBotSync(snap, level) {
+    if (!botSyncEngine) botSyncEngine = (new Function(botEngineSource() + '\nreturn BotEngine;'))();
+    return botSyncEngine.chooseMove(snap, level);
+  }
+
+  function requestBotMove(token) {
+    const snap = buildSnapshot();
+    const level = botLevel;
+
+    const finish = (res) => handleBotResult(token, res);
+
+    if (!botWorkerBroken) {
+      try {
+        if (!botWorker) {
+          const code = botEngineSource() +
+            '\nself.onmessage = function (e) {' +
+            '  var d = e.data, r = null, err = null;' +
+            '  try { r = BotEngine.chooseMove(d.snap, d.level); } catch (x) { err = String(x && x.stack || x); }' +
+            '  self.postMessage({ token: d.token, move: r, error: err });' +
+            '};';
+          const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+          botWorker = new Worker(url);
+          botWorker.onmessage = (e) => {
+            if (e.data.error) console.error('Bot worker error:', e.data.error);
+            handleBotResult(e.data.token, e.data.move);
+          };
+          botWorker.onerror = (e) => {
+            console.warn('Bot worker lỗi, chuyển sang chạy trực tiếp.', e && e.message);
+            botWorkerBroken = true;
+            botWorker = null;
+            if (botBusy) setTimeout(() => finish(safeSync(snap, level)), 0);
+          };
+        }
+        botWorker.postMessage({ token: token, snap: snap, level: level });
+        return;
+      } catch (err) {
+        console.warn('Không tạo được Worker, chạy bot trực tiếp.', err);
+        botWorkerBroken = true;
+        botWorker = null;
+      }
+    }
+    setTimeout(() => finish(safeSync(snap, level)), 20);
+  }
+
+  function safeSync(snap, level) {
+    try { return runBotSync(snap, level); }
+    catch (err) { console.error(err); return null; }
+  }
+
+  function fallbackBotMove() {
+    const movable = nodes.filter(n => n.player === currentPlayer && n.alive);
+    const options = [];
+    movable.forEach(n => computeValidTargets(n).forEach(t => options.push({ srcId: n.id, ...t })));
+    if (options.length === 0) return null;
+    return options[Math.floor(Math.random() * options.length)];
+  }
+
+  function handleBotResult(token, res) {
+    if (token !== botToken || gameOver) return;
+
+    let src = null, target = null;
+    if (res) {
+      src = nodes.find(n => n.id === res.srcId);
+      if (src) target = computeValidTargets(src).find(t => t.gx === res.gx && t.gy === res.gy) || null;
+    }
+    if (!src || !target) {
+      console.warn('Bot trả về nước không hợp lệ, dùng nước dự phòng.', res);
+      const fb = fallbackBotMove();
+      if (!fb) { botBusy = false; return; }
+      src = nodes.find(n => n.id === fb.srcId);
+      target = { gx: fb.gx, gy: fb.gy, existingNodeId: fb.existingNodeId, type: fb.type };
+      res = null;
+    }
+
+    // Hiển thị nước đi của Bot một chút trước khi thực hiện
+    selectedNode = src;
+    validTargets = [target];
+    if (res && res.ms !== undefined) {
+      logAction(`🤖 Bot nghĩ ${(res.ms / 1000).toFixed(1)}s (${res.evals} thế cờ) → ${target.type} tại (${target.gx}, ${target.gy})`);
+    }
+    draw();
+    setTimeout(() => {
+      if (token !== botToken || gameOver) return;
+      botBusy = false;
+      executeMove(src, target);
+    }, 450);
+  }
+
+  // Canvas Pan & Zoom Control Event Listeners
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    hasDragged = false;
+    dragStart = { x: e.clientX - camera.x, y: e.clientY - camera.y };
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (isDragging) {
+      const dx = Math.abs(e.clientX - (dragStart.x + camera.x));
+      const dy = Math.abs(e.clientY - (dragStart.y + camera.y));
+      if (dx > 4 || dy > 4) hasDragged = true;
+
+      camera.x = e.clientX - dragStart.x;
+      camera.y = e.clientY - dragStart.y;
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    if (!hasDragged) {
+      handleCanvasClick(e);
+    }
+    isDragging = false;
+  });
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newZoom = Math.min(Math.max(0.5, camera.zoom * zoomFactor), 2.5);
+
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+
+    camera.x = mouseX - (mouseX - camera.x) * (newZoom / camera.zoom);
+    camera.y = mouseY - (mouseY - camera.y) * (newZoom / camera.zoom);
+    camera.zoom = newZoom;
+    draw();
+  });
+
+  window.addEventListener('resize', () => {
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    draw();
+  });
+
+  // Launch Game
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
+  initGame();
+</script>
+</body>
+</html>
